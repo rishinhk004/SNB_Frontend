@@ -70,12 +70,12 @@ export default function SessionsTable({ params }) {
       ) : sessions.length === 0 ? (
         <p>No sessions found for this course.</p>
       ) : (
-        <table className="min-w-full border divide-y divide-gray-200 overflow-hidden rounded-lg shadow-md">
+        <table className="min-w-full overflow-hidden border divide-y divide-gray-200 rounded-lg shadow-md">
   <thead className="bg-gray-900">
     <tr>
-      <th className="px-4 py-3 text-left text-xl font-semibold text-white uppercase tracking-wider">Date</th>
-      <th className="px-4 py-3 text-left text-xl font-semibold text-white uppercase tracking-wider">Status</th>
-      <th className="px-4 py-3 text-center text-xl font-semibold text-white uppercase tracking-wider">Action</th>
+      <th className="px-4 py-3 text-xl font-semibold tracking-wider text-left text-white uppercase">Date</th>
+      <th className="px-4 py-3 text-xl font-semibold tracking-wider text-left text-white uppercase">Status</th>
+      <th className="px-4 py-3 text-xl font-semibold tracking-wider text-center text-white uppercase">Action</th>
     </tr>
   </thead>
   <tbody className="bg-white divide-y divide-gray-200">
@@ -95,8 +95,8 @@ export default function SessionsTable({ params }) {
           : 'text-yellow-600 bg-yellow-50';
 
       return (
-        <tr key={session.id} className="hover:bg-gray-50 transition">
-          <td className="px-4 py-3 whitespace-nowrap text-xl text-gray-800">
+        <tr key={session.id} className="transition hover:bg-gray-50">
+          <td className="px-4 py-3 text-xl text-gray-800 whitespace-nowrap">
             {dayjs(session.date).format('DD MMM YYYY')}
           </td>
           <td className={`px-4 py-3 whitespace-nowrap text-xl font-medium rounded ${statusColor}`}>
