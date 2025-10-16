@@ -19,6 +19,123 @@ import { format } from 'date-fns';
 import axios from 'axios';
 import { toast } from 'sonner';
 
+const AnnouncementModal = ({ onClose, courseId, onSave }) => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [attachment, setAttachment] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    if (!title || !content) {
+      toast.error('Title and content are required');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('courseId', courseId);
+      formData.append('title', title);
+      formData.append('content', content);
+      if (attachment) formData.append('attachment', attachment);
+
+      await apiClient.post('/announcements', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      toast.success('Announcement created!');
+      onSave(); // Refresh announcements
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create announcement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className={styles.modalOverlay}>
+      <div className={styles.modalContent}>
+        <button className={styles.closeButton} onClick={onClose}>
+          &times;
+        </button>
+        <h2>Create Announcement</h2>
+        <form onSubmit={handleSave}>
+          <div className={styles.formGroup}>
+            <label>Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className={styles.formGroup}>
+            <label>Content</label>
+            <textarea
+              rows="4"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              required
+            ></textarea>
+          </div>
+          <div className={styles.formGroup}>
+            <label>Attachment (optional)</label>
+            <input type="file" onChange={(e) => setAttachment(e.target.files[0])} />
+          </div>
+          <button type="submit" className={styles.saveButton} disabled={loading}>
+            {loading ? 'Creating...' : 'Create Announcement'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Component to show announcements (for both professors and students)
+const AnnouncementsList = ({ courseId }) => {
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchAnnouncements = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiClient.get(`/announcements/course/${courseId}`);
+      setAnnouncements(res.data.msg || []);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load announcements');
+    } finally {
+      setLoading(false);
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
+
+  if (loading) return <p>Loading announcements...</p>;
+  if (announcements.length === 0) return <p>No announcements yet.</p>;
+
+  return (
+    <div className={styles.announcementList}>
+      {announcements.map((ann) => (
+        <div key={ann.id} className={styles.announcementCard}>
+          <h4>{ann.title}</h4>
+          <p>{ann.content}</p>
+          {ann.attachment && (
+            <a href={ann.attachment} target="_blank" rel="noopener noreferrer">
+              View Attachment
+            </a>
+          )}
+          <small>Posted on: {new Date(ann.createdAt).toLocaleString()}</small>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const AddCourseModal = ({ onClose, onSave, professorId }) => {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
@@ -237,6 +354,9 @@ const ProfessorLayout = ({ user }) => {
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
 
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [announcementKey, setAnnouncementKey] = useState(0);
+
   const fetchMyCourses = useCallback(
     async (selectCourseId = null) => {
       setIsLoading(true);
@@ -417,6 +537,15 @@ const ProfessorLayout = ({ user }) => {
         <TimetableModal
           onClose={() => setIsTimetableModalOpen(false)}
           onSave={handleSaveTimetable}
+        />
+      )}
+      {isAnnouncementModalOpen && selectedCourse && (
+        <AnnouncementModal
+          onClose={() => setIsAnnouncementModalOpen(false)}
+          courseId={selectedCourse.id}
+          onSave={() => {
+            setAnnouncementKey((prevKey) => prevKey + 1);
+          }}
         />
       )}
 
@@ -649,6 +778,17 @@ const ProfessorLayout = ({ user }) => {
                 </table>
               </div>
             )}
+            <hr className={styles.divider} />
+            <h2>Announcements</h2>
+            <div className={styles.actions}>
+              <button onClick={() => setIsAnnouncementModalOpen(true)}>
+                Create New Announcement
+              </button>
+            </div>
+            <AnnouncementsList
+              key={announcementKey}
+              courseId={selectedCourse.id}
+            />
           </div>
         )}
       </main>
@@ -661,6 +801,7 @@ const StudentLayout = ({ user }) => {
   const [allCourses, setAllCourses] = useState([]);
   const [myCourses, setMyCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewingAnnouncementsFor, setViewingAnnouncementsFor] = useState(null);
 
   const router = useRouter();
 
@@ -717,6 +858,19 @@ const StudentLayout = ({ user }) => {
 
   return (
     <div className={styles.pageContainer}>
+      <Dialog
+        open={!!viewingAnnouncementsFor}
+        onOpenChange={(isOpen) => !isOpen && setViewingAnnouncementsFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Announcements</DialogTitle>
+          </DialogHeader>
+          {viewingAnnouncementsFor && (
+            <AnnouncementsList courseId={viewingAnnouncementsFor} />
+          )}
+        </DialogContent>
+      </Dialog>
       <aside className={styles.sidebar}>
         <h2>Navigation</h2>
         <ul>
@@ -773,12 +927,19 @@ const StudentLayout = ({ user }) => {
                         </button>
                       </>
                     ) : (
-                      <div className = "flex flex-row">
+                      <div className="flex flex-row">
+                        <button
+                          className={styles.buttonDark}
+                          onClick={() => setViewingAnnouncementsFor(course.id)}
+                        >
+                          Announcements
+                        </button>
                         <button
                           className={styles.buttonDark}
                           onClick={() =>
                             router.push(`/discussion/${course.id}`)
                           }
+                          style={{ marginLeft: '8px' }}
                         >
                           Discussion
                         </button>
