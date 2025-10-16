@@ -4,8 +4,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext.jsx';
 import apiClient from '../utils/apiClient.js';
-import { X } from 'lucide-react'
-import { DialogClose } from "../../components/ui/dialog.jsx"
+import { X } from 'lucide-react';
+import { DialogClose } from '../../components/ui/dialog.jsx';
 import styles from './courses.module.scss';
 import {
   Dialog,
@@ -16,6 +16,8 @@ import {
 import { Button } from '../../components/ui/button.jsx';
 import { Calendar } from '../../components/ui/calendar.jsx';
 import { format } from 'date-fns';
+import axios from 'axios';
+import { toast } from 'sonner';
 
 const AddCourseModal = ({ onClose, onSave, professorId }) => {
   const [name, setName] = useState('');
@@ -148,7 +150,7 @@ const TimetableModal = ({ onClose, onSave }) => {
   };
 
   return (
-    <div className={styles.modalOverlay}>      
+    <div className={styles.modalOverlay}>
       <div className={styles.modalContent}>
         <button className={styles.closeButton} onClick={onClose}>
           &times;
@@ -525,10 +527,10 @@ const ProfessorLayout = ({ user }) => {
                   <DialogContent className="flex flex-col gap-10 overflow-hidden">
                     <DialogClose asChild>
                       <button
-                        className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none"
+                        className="absolute transition-opacity rounded-sm right-4 top-4 opacity-70 ring-offset-background hover:opacity-100 focus:outline-none"
                         aria-label="Close"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="w-4 h-4" />
                       </button>
                     </DialogClose>
 
@@ -548,10 +550,11 @@ const ProfessorLayout = ({ user }) => {
                       <Button
                         onClick={handleGenerateOneSession}
                         disabled={!date || loading}
-                        className={`w-full rounded-md px-4 py-2 text-white font-semibold transition ${!date || loading
+                        className={`w-full rounded-md px-4 py-2 text-white font-semibold transition ${
+                          !date || loading
                             ? 'bg-gray-400 cursor-not-allowed'
                             : 'bg-black hover:bg-gray-900'
-                          }`}
+                        }`}
                       >
                         {loading ? 'Generating...' : 'Generate Session'}
                       </Button>
@@ -656,10 +659,9 @@ const ProfessorLayout = ({ user }) => {
 const StudentLayout = ({ user }) => {
   const [view, setView] = useState('available');
   const [allCourses, setAllCourses] = useState([]);
-  const [enrolledIds, setEnrolledIds] = useState(
-    () => new Set((user.courses || []).map((e) => e.courseId))
-  );
+  const [myCourses, setMyCourses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const router = useRouter();
 
   const fetchAllCourses = useCallback(async () => {
@@ -668,28 +670,48 @@ const StudentLayout = ({ user }) => {
       const response = await apiClient.get('/courses');
       setAllCourses(response.data.msg || []);
     } catch (error) {
-      console.error('Error fetching courses:', error);
+      console.error('Error fetching all courses:', error);
       alert(error.response?.data?.message || 'Could not load courses.');
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  const fetchMyCourses = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/users/${user.id}`
+      );
+      setMyCourses(res.data.msg.courses || []);
+    } catch (err) {
+      console.error('Failed to fetch user:', err);
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchAllCourses();
-  }, [fetchAllCourses]);
+    fetchMyCourses();
+  }, [fetchAllCourses, fetchMyCourses]);
 
   const handleEnroll = async (courseId) => {
     try {
       await apiClient.post('/enrollments', { courseId, userId: user.id });
-      setEnrolledIds((prev) => new Set(prev).add(courseId));
+      toast.success('Enrolled successfully in the course!');
+      await fetchMyCourses();
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to enroll');
+      toast.error(error.response?.data?.message || 'Failed to enroll');
     }
   };
 
-  const availableCourses = allCourses.filter((c) => !enrolledIds.has(c.id));
-  const enrolledCourses = allCourses.filter((c) => enrolledIds.has(c.id));
+  const enrolledCourseIds = myCourses.map((c) => c.course?.id || c.id);
+  const availableCourses = allCourses.filter(
+    (course) => !enrolledCourseIds.includes(course.id)
+  );
+  const enrolledCourses = allCourses.filter((course) =>
+    enrolledCourseIds.includes(course.id)
+  );
+
   const coursesToDisplay =
     view === 'available' ? availableCourses : enrolledCourses;
 
@@ -712,10 +734,12 @@ const StudentLayout = ({ user }) => {
           </li>
         </ul>
       </aside>
+
       <main className={styles.mainContent}>
         <h1>
           {view === 'available' ? 'Available Courses' : 'My Enrolled Courses'}
         </h1>
+
         {isLoading ? (
           <p>Loading...</p>
         ) : (
@@ -730,6 +754,7 @@ const StudentLayout = ({ user }) => {
                       {course.professor?.name || 'N/A'}
                     </p>
                   </div>
+
                   <div className={styles.courseActions}>
                     {view === 'available' ? (
                       <>
@@ -742,18 +767,29 @@ const StudentLayout = ({ user }) => {
                         <button
                           className={styles.buttonDark}
                           onClick={() => router.push(`/sessions/${course.id}`)}
-                          style={{ marginLeft: '8px' }} // Optional: spacing
+                          style={{ marginLeft: '8px' }}
                         >
-                          View AllSessions
+                          View All Sessions
                         </button>
                       </>
                     ) : (
-                      <button
-                        className={styles.buttonDark}
-                        onClick={() => router.push(`/discussion/${course.id}`)}
-                      >
-                        Discussion
-                      </button>
+                      <div className = "flex flex-row">
+                        <button
+                          className={styles.buttonDark}
+                          onClick={() =>
+                            router.push(`/discussion/${course.id}`)
+                          }
+                        >
+                          Discussion
+                        </button>
+                        <button
+                          className={styles.buttonDark}
+                          onClick={() => router.push(`/sessions/${course.id}`)}
+                          style={{ marginLeft: '8px' }}
+                        >
+                          View All Sessions
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

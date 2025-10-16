@@ -10,8 +10,15 @@ const Navbar = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    setIsLoggedIn(!!token);
+    // ✅ Use event-based update for login state (in case other tabs log in/out)
+    const checkLoginStatus = () => {
+      const token = localStorage.getItem('token');
+      setIsLoggedIn(!!token);
+    };
+
+    checkLoginStatus();
+    window.addEventListener('storage', checkLoginStatus);
+    return () => window.removeEventListener('storage', checkLoginStatus);
   }, []);
 
   const handleLogout = () => {
@@ -23,82 +30,53 @@ const Navbar = () => {
 
   return (
     <nav className={style.navbar}>
-      <div className={style.logo}>MyApp</div>
-
-      <div className={`${style.links} ${showMenu ? style.mobileMenu : ''}`}>
-        <div className={style.linkWrapper}>
-          <NavLink
-            to="/home"
-            className={({ isActive }) => (isActive ? style.active : '')}
-            onClick={() => setShowMenu(false)}
-          >
-            Home
-          </NavLink>
-        </div>
-        <div className={style.linkWrapper}>
-          <NavLink
-            to="/about"
-            className={({ isActive }) => (isActive ? style.active : '')}
-            onClick={() => setShowMenu(false)}
-          >
-            About
-          </NavLink>
-        </div>
-        <div className={style.linkWrapper}>
-          <NavLink
-            to="/addclass"
-            className={({ isActive }) => (isActive ? style.active : '')}
-            onClick={() => setShowMenu(false)}
-          >
-            Add Class
-          </NavLink>
-        </div>
-        <div className={style.linkWrapper}>
-          <NavLink
-            to="/schedule"
-            className={({ isActive }) => (isActive ? style.active : '')}
-            onClick={() => setShowMenu(false)}
-          >
-            Schedule
-          </NavLink>
-        </div>
+      <div className={style.logo} onClick={() => navigate('/home')}>
+        MyApp
       </div>
 
+      {/* ✅ Mobile menu toggle */}
+      <div className={`${style.links} ${showMenu ? style.mobileMenu : ''}`}>
+        {['/home', '/about', '/addclass', '/schedule'].map((path, index) => {
+          const label = path.slice(1).charAt(0).toUpperCase() + path.slice(2);
+          return (
+            <div className={style.linkWrapper} key={index}>
+              <NavLink
+                to={path}
+                className={({ isActive }) => (isActive ? style.active : '')}
+                onClick={() => setShowMenu(false)}
+              >
+                {label}
+              </NavLink>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ✅ Profile + Dropdown */}
       <div className={style.profile}>
-        <div
+        <button
           className={style.icon}
           onClick={() => setShowDropdown((prev) => !prev)}
+          aria-label="Profile Menu"
         >
           <FaUserCircle size={28} />
-        </div>
+        </button>
+
         {showDropdown && (
           <div className={style.dropdown}>
+            <Link to="/profile" onClick={() => setShowDropdown(false)}>
+              Profile
+            </Link>
+
             {isLoggedIn ? (
-              <>
-                <Link to="/profile" onClick={() => setShowDropdown(false)}>
-                  Profile
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    all: 'unset',
-                    cursor: 'pointer',
-                    padding: '0.8rem 1.2rem',
-                    display: 'block',
-                    fontSize: '1.5rem',
-                    color: '#333',
-                    width: '100%',
-                    textAlign: 'left',
-                  }}
-                >
-                  Logout
-                </button>
-              </>
+              <button
+                onClick={handleLogout}
+                className={style.logoutButton}
+              >
+                Logout
+              </button>
             ) : (
               <>
-                <Link to="/profile" onClick={() => setShowDropdown(false)}>
-                  Profile
-                </Link>
                 <Link to="/login" onClick={() => setShowDropdown(false)}>
                   Login
                 </Link>
@@ -111,7 +89,11 @@ const Navbar = () => {
         )}
       </div>
 
-      <div className={style.menuIcon} onClick={() => setShowMenu(!showMenu)}>
+      {/* ✅ Hamburger menu */}
+      <div
+        className={style.menuIcon}
+        onClick={() => setShowMenu((prev) => !prev)}
+      >
         {showMenu ? <FaTimes size={24} /> : <FaBars size={24} />}
       </div>
     </nav>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -11,13 +11,19 @@ import axios from 'axios';
 
 const LoginPage = () => {
   const router = useRouter();
+  const { user, setUser, setToken } = useAuth();
 
-  const { setUser, setToken } = useAuth();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
-  // const [role, setRole] = useState("");
+
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/profile');
+    }
+  }, [user, router]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,7 +35,7 @@ const LoginPage = () => {
 
     const emailRegex = /^[^\s@]+@([a-z]+\.)?nits\.ac\.in$/i;
     if (!emailRegex.test(email)) {
-      setError(
+      setMessage(
         'Please use your official college email ending in @nits.ac.in or @<dept>.nits.ac.in'
       );
       return;
@@ -50,14 +56,12 @@ const LoginPage = () => {
 
       const res = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/auth/signIn`,
-        {
-          token,
-        }
+        { token }
       );
 
       setUser(res.data.msg.user);
       setToken(token);
-      router.push('/');
+      router.push('/profile');
     } catch (err) {
       const msg = err?.response?.data?.msg || err?.message || 'Login failed';
       setMessage(msg);
@@ -88,22 +92,6 @@ const LoginPage = () => {
             className={style.input}
             placeholder="e.g. samarjitroy025@gmail.com"
           />
-
-          {/* <div className={style.row}>
-            <div className={style.halfInput}>
-              <label>Role *</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className={style.select}
-              >
-                <option value="">Select Role</option>
-                <option value="Student">Student</option>
-                <option value="Professor">Professor</option>
-
-              </select>
-            </div>
-          </div> */}
 
           <label className={style.label}>Password *</label>
           <input
